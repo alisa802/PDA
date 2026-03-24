@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO2 Monitorings</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --text: #1e293b;
+        }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        
+        /* Galvenes stils */
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; color: #0f172a; margin-bottom: 10px; }
+        
+        /* Izvēles kartītes sākumā */
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-top: 50px; }
+        .menu-card { 
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); cursor: pointer; transition: 0.3s; border: 2px solid transparent;
+        }
+        .menu-card:hover { transform: translateY(-10px); border-color: var(--primary); }
+        .menu-card i { font-size: 50px; display: block; margin-bottom: 15px; }
+        
+        /* Formas un vadības elementi */
+        .controls { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .back-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-weight: bold; margin-bottom: 20px; }
+        
+        select { padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; width: 200px; font-size: 1rem; }
+        .action-btn { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+
+        /* Rezultātu kartītes */
+        .data-card { 
+            background: white; max-width: 500px; margin: auto; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .ppm-val { font-size: 4rem; font-weight: 800; margin: 15px 0; display: block; }
+        .c-green { color: #10b981; }
+        .c-yellow { color: #f59e0b; }
+        .c-red { color: #ef4444; }
+
+        img { width: 100%; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Gaisa Kvalitātes Sistēma</h1>
+        <p>CO2 līmeņa monitorings un analīze</p>
+    </div>
+
+    {% if not view_mode %}
+    <div class="menu-grid">
+        <form method="POST" style="display:contents">
+            <input type="hidden" name="view_mode" value="graph">
+            <div class="menu-card" onclick="this.parentNode.submit()">
+                <div style="font-size: 40px;">📊</div>
+                <h3>Vizuālie Grafiki</h3>
+                <p>Skatīt CO2 līmeņa izmaiņas laika skalā</p>
+            </div>
+        </form>
+
+        <form method="POST" style="display:contents">
+            <input type="hidden" name="view_mode" value="data">
+            <div class="menu-card" onclick="this.parentNode.submit()">
+                <div style="font-size: 40px;">🔢</div>
+                <h3>Precīzi Skaitļi</h3>
+                <p>Uzzināt konkrētus rādītājus un statusu</p>
+            </div>
+        </form>
+    </div>
+
+    {% elif view_mode == 'graph' %}
+    <form method="GET" action="/" style="display:inline;"><button class="back-btn">← Atpakaļ uz sākumu</button></form>
+    
+    <div class="controls">
+        <form method="POST">
+            <input type="hidden" name="view_mode" value="graph">
+            <label>Izvēlieties dienu:</label>
+            <select name="day_select">
+                <option value="">-- Kopskats --</option>
+                {% for d in all_days %}
+                <option value="{{ d }}" {% if selected_day|int == d %}selected{% endif %}>{{ d }}. diena</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="action-btn">Atjaunot grafiku</button>
+        </form>
+    </div>
+    <img src="data:image/png;base64,{{ plot_url }}" alt="CO2 grafiks">
+
+    {% elif view_mode == 'data' %}
+    <form method="GET" action="/" style="display:inline;"><button class="back-btn">← Atpakaļ uz sākumu</button></form>
+    
+    <div class="controls">
+        <form method="POST">
+            <input type="hidden" name="view_mode" value="data">
+            <label>Uzzināt datus par:</label>
+            <select name="day_select" required>
+                <option value="">-- Izvēlieties dienu --</option>
+                {% for d in all_days %}
+                <option value="{{ d }}" {% if selected_day|int == d %}selected{% endif %}>{{ d }}. diena</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="action-btn">Rādīt rezultātu</button>
+        </form>
+    </div>
+
+    {% if selected_data %}
+    <div class="data-card">
+        <span style="color: #64748b; text-transform: uppercase; letter-spacing: 1px;">{{ selected_day }}. dienas rādījums</span>
+        <span class="ppm-val {{ status_info[1] }}">{{ selected_data|round(0) }} <small style="font-size: 1.5rem">ppm</small></span>
+        <h2 class="{{ status_info[1] }}">{{ status_info[0] }}</h2>
+        <p style="color: #64748b;">
+            {% if status_info[0] == "TEICAMI" %} Gaiss ir tīrs un svaigs. {% elif status_info[0] == "VIDĒJI" %} Ieteicams izvēdināt telpas. {% else %} Nepieciešama tūlītēja ventilācija! {% endif %}
+        </p>
+    </div>
+    {% else %}
+    <p style="text-align: center; color: #64748b;">Lūdzu, izvēlieties dienu, lai redzētu analīzi.</p>
+    {% endif %}
+    {% endif %}
+
+</div>
+
+</body>
+</html>
